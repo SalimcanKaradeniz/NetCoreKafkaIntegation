@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="KafkaDemo.Consumer/KafkaDemo.Consumer.csproj" />
+  <Project Path="KafkaDemo.Contracts/KafkaDemo.Contracts.csproj" />
+  <Project Path="KafkaDemo.Producer/KafkaDemo.Producer.csproj" />
+</Solution>
