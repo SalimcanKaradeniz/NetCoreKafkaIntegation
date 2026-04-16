@@ -1,0 +1,116 @@
+# .github/workflows/ci-cd.yml
+name: KafkaDemo CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PRODUCER_IMAGE: ${{secrets.DOCKERHUB_USERNAME}}/kafkademo-producer
+  CONSUMER_IMAGE: ${{secrets.DOCKERHUB_USERNAME}}/kafkademo-consumer
+
+jobs:
+
+  # =============================================
+  # JOB 1: CI — Build ve Test
+  # =============================================
+
+  ci:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1.Kodu indir
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. .NET kur
+      - name: .NET kurulumu
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{env.DOTNET_VERSION}}
+
+      # 3.Bağımlılıkları Yükle
+      - name: Restore
+        run: dotnet restore KafkaDemo.slnx
+
+      # 4. Build al
+      - name: Build
+        run: dotnet build KafkaDemo.slnx --no-restore -c Relase
+
+      # 5.Testleri Çalıştır
+      - name: Test
+        run: dotnet test KafkaDemo.slnx --no-build -c Relase --verbosity normal
+
+  # =============================================
+  # JOB 2: CD — Docker Build & Push
+  # CI başarılı olursa ve sadece main branch'te çalışır
+  # =============================================
+
+  cd:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Docker Hub'a giriş
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Image tag'lerini belirle
+      # main branch: latest + commit SHA (geri dönüş için)
+
+      - name: Image metadata - Producer
+        id: metadata-producer
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.PRODUCER_IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Image metadata - Consumer
+        id: metadata-consumer
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.CONSUMER_IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      # Producer image build & push
+      - name: Producer - Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context:
+            file: KafkaDemo.Producer/Dockerfile
+            push: true
+            tags: ${{ steps.meta-producer.outputs.tags }}
+
+      # Consumer image build & push
+      - name: Consumer - Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context:
+            file: KafkaDemo.Consumer/Dockerfile
+            push: true
+            tags: ${{ steps.meta-consumer.outputs.tags }}
+
+      # Özet — Actions UI'da görünür
+      - name: Özet
+        run: |
+          echo "## Deploy Özeti" >> $GITHUB_STEP_SUMMARY
+          echo "Producer: ${{ env.PRODUCER_IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "Consumer: ${{ env.CONSUMER_IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
