@@ -24,6 +24,7 @@ var app = builder.Build();
 
 app.MapPost("/orders", async (CreateOrderRequest request, IProducer<string, string> producer) =>
 {
+
     var orderEvent = new OrderCreatedEvent
     (
         OrderId: Guid.NewGuid(),

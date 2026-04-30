@@ -26,6 +26,7 @@ public class OrderConsumerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+
         _consumer.Subscribe("orders-topic");
         _logger.LogInformation("Sipariş Consumer Başladı...");
 
